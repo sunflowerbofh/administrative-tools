@@ -5,7 +5,7 @@ set -e
 # simple things first
 wrap-and-sort -bast -N
 
-# compare source name in control and chanelog file
+# compare source name in control and changelog file
 SOURCE1=$(head -n 1 debian/changelog |awk '{ print $1 }')
 SOURCE2=$(grep Source debian/control | awk '{ print $2 }')
 
