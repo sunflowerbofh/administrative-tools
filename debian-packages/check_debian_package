@@ -1,0 +1,171 @@
+#!/bin/sh
+
+set -e
+
+# simple things first
+wrap-and-sort -bast -N
+
+# compare source name in control and chanelog file
+SOURCE1=$(head -n 1 debian/changelog |awk '{ print $1 }')
+SOURCE2=$(grep Source debian/control | awk '{ print $2 }')
+
+if [ "$SOURCE1" != "$SOURCE2" ]
+then
+	echo "Source package name in changelog and control differ: $SOURCE1, $SOURCE2"
+	echo ""
+fi
+
+# check ITP bug number in changelog
+BUGNR=$(grep Closes debian/changelog | awk -F# '{ print $2 }' | sed -e 's|[^[[:digit:]]\.]*||')
+ITP=$(curl -s "https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=$BUGNR" | grep "Package name" | awk -F: '{ print $2 }' | sed -e 's|^[[:space:]]*||')
+PACKAGE=$(awk '/Package:/ { print $2 }' debian/control)
+
+if [ "$PACKAGE" != "$ITP" ]
+then
+	echo "Wrong bug number ${BUGNR} for package $ITP / $PACKAGE."
+	echo ""
+fi
+
+CLOSE=$(grep Closes debian/changelog)
+if [ -n "$CLOSE" ]
+then
+	BUGNR=$(echo "$CLOSE" | grep -E "#[[:digit:]]*") || true
+	if [ -z "$BUGNR" ]
+	then
+		echo "Bug number missing '#'"
+	fi
+fi
+
+# check correctness of tarball version if existing
+VERSION=$(head -n1 debian/changelog | awk -F'\\(|\\)' '{print $2 }'| sed -e 's|-[[:digit:]]*$||')
+if [ ! -e "../${SOURCE2}_${VERSION}.orig.tar.xz" ]
+then
+	echo "${SOURCE2}_${VERSION}.orig.tar.xz missing - not checking"
+else
+	TARDIR=$(tar -tvf "../${SOURCE2}_${VERSION}.orig.tar.xz" | head -n1 | awk '{ print $6 }' | sed -e 's|/$||')
+	if [ "$TARDIR" != "${SOURCE2}-${VERSION}" ]
+	then
+		echo "Source archive has not the correct name: $TARDIR."
+		echo ""
+	fi
+fi
+
+# check version format in changelog
+FULLVERSION=$(head -n1 debian/changelog | awk -F\( '{ print $2 }' | sed -e 's|).*$||')
+MATCHVERSION=$(echo "$FULLVERSION" | grep -E +[[:digit:]].+[[:digit:]].+[[:digit:]]-+[[:digit:]]) || true
+if [ -z "$MATCHVERSION" ]
+then
+	echo "Version number $FULLVERSION in changelog seems to be incorrect."
+fi
+
+# check email address format and correctness in changelog
+EMAIL1=$(tail -n1 debian/changelog | awk '{ print $4 }')
+NAME=$(tail -n1 debian/changelog | awk '{ print $2 }' | tr [:upper:] [:lower:])
+SURNAME=$(tail -n1 debian/changelog | awk '{ print $3 }' | tr [:upper:] [:lower:])
+DOMAIN=$(awk -F@ '/Maintainer:/ { print $2 }' debian/control)
+
+EMAIL2="<${NAME}.${SURNAME}@${DOMAIN}"
+if [ "$EMAIL1" != "$EMAIL2" ]
+then
+	echo "Email address is: $EMAIL1"
+	echo ""
+fi
+
+# check upstream name in copyright
+README_NAME=$(head -n3 README.md | awk '/^#/ { print $2 }')
+UPSTREAM_NAME=$(awk '/Upstream-Name:/ { print $2 }' debian/copyright)
+
+if [ -n "$README_NAME" ] && [ "$README_NAME" != "$UPSTREAM_NAME" ]
+then
+	echo "Name in README is $README_NAME, in upstream is $UPSTREAM_NAME."
+	echo ""
+fi
+
+# check if standards-version is actual
+ACTUAL_POLICY=$(curl -s https://tracker.debian.org/pkg/debian-policy|grep -A 1 std-ver|tail -n1 | sed -e 's|[[:space:]]*||g')
+POLICY=$(awk '/Standards-Version:/ { print $2 }' debian/control)
+if [ "$ACTUAL_POLICY" != "$POLICY" ]
+then
+	echo "Debian-policy is $ACTUAL_POLICY, not $POLICY."
+	echo ""
+fi
+
+# checking format of Homepage, Vcs-* in control
+for PARAM in Homepage Vcs-Browser Vcs-Git
+do
+	if ! grep -q "$PARAM" debian/control
+	then
+		echo "$PARAM is missing in debian/control."
+		echo ""
+	else
+		STR=$(awk -v VCS=$PARAM '$0 ~ VCS { print $2 }' debian/control)
+		LAST_LETTER=$(echo -n "$STR" | tail -c 1)
+
+		if [ "$LAST_LETTER" = '/' ]
+		then
+			echo "Trailing slash at the end of $PARAM"
+			echo ""
+		fi
+	fi
+done
+
+# for php packages check if composer integrated correctly
+PHP=$(grep phpcomposer debian/control)
+
+if [ -n "$PHP" ]
+then
+	for OPT in require suggest replace conflict
+	do
+		if ! grep -q "Debian-${OPT}" debian/control
+		then
+			echo "Debian-$OPT missing."
+			echo ""
+		fi
+	done
+fi
+
+# check if copyright authors identical
+LICENSE="LICENSE"
+if [ ! -e "$LICENSE" ]
+then
+	LICENSE="LICENSE.txt"
+fi
+if [ ! -e "$LICENSE" ]
+then
+	LICENSE="LICENSE.md"
+fi
+
+COPYRIGHT1=$(grep Copyright "$LICENSE" | awk '{ $1=$2=""; print $0 }' \
+ | sed -e 's|^[[:space:]]*||')
+COPYRIGHT2=$(grep Copyright debian/copyright | head -n 1 | \
+ awk '{ $1=""; print $0 }' | sed -e 's|^[[:space:]]*||')
+
+if [ "$COPYRIGHT1" != "$COPYRIGHT2" ]
+then
+	echo "Copyright is not equal: $COPYRIGHT1 <-> $COPYRIGHT2."
+	echo ""
+fi
+
+# check if patches are in subdirectories of patches/
+if [ -d debian/patches ]
+then
+	PATCH=$(find debian/patches -maxdepth 1 -type f ! -name series)
+	if [ -n "$PATCH" ]
+	then
+		echo "$PATCH is directly under /patches, think of creating a subdirectory."
+		echo ""
+	fi
+fi
+
+# everything clean?
+if [ -e debian/*.substvars ]
+then
+	echo "Forgotten debian/rules clean?"
+	echo ""
+fi
+
+# lintian checks if package built
+if [ -e "${PACKAGE}_${VERSION}*deb" ]
+then
+	lintian -I --pedantic
+fi

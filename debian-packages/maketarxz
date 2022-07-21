@@ -1,0 +1,35 @@
+#!/bin/sh
+
+DIR="$1"
+if [ -z "$DIR" ]
+then
+	DIR=$(basename $(pwd))
+else
+	OLDPWD=$(pwd)
+	cd "$DIR" || exit 1
+fi
+
+SRC=$(awk '/Source/ { print $2 }' debian/control)
+VER=$(head -n1 debian/changelog|awk -F'\\(|\\)' '{print $2 }'|sed -e 's|-[[:digit:]]*$||')
+cd ..
+if [ -d "${SRC}-${VER}" ]
+then
+	echo "../${SRC}-${VER} already existing - leaving..."
+	exit 42
+else
+	cp -r "$DIR" "${SRC}-${VER}"
+fi
+
+for F in .git debian .pc
+do
+	if [ -e "${SRC}-${VER}/$F" ]
+	then
+		rm -rf "${SRC}-${VER}/$F"
+	fi
+done
+
+tar -cJvf "${SRC}_${VER}.orig.tar.xz" "${SRC}-${VER}" || (echo "TARing went wrong" && exit 1)
+rm -rf "${SRC}-${VER}"
+echo
+echo "${SRC}_${VER}.orig.tar.xz created"
+cd "$OLDPWD"

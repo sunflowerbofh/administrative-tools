@@ -1,0 +1,63 @@
+#!/bin/sh
+
+set -e
+
+TAR="$1"
+
+if [ -z "$TAR" ]
+then
+	echo "Usage: $0 <name.tar.gz>"
+	exit 42
+fi
+
+Parameters ()
+{
+	GETOPT_LONGOPTIONS="remove,"
+	GETOPT_OPTIONS="r,"
+
+	PARAMETERS="$(getopt --longoptions ${GETOPT_LONGOPTIONS} --name=${COMMAND} --options ${GETOPT_OPTIONS} --shell sh -- ${@})"
+
+	if [ "${?}" != "0" ]
+	then
+		echo "'${COMMAND}': getopt exit" >&2
+		exit 1
+	fi
+
+	eval set -- "${PARAMETERS}"
+
+	while true
+	do
+		case "${1}" in
+			-r|--name)
+				REMOVE="true"
+				shift 1
+				;;
+
+			--)
+				shift 1
+				break
+				;;
+
+			*)
+				echo "'${COMMAND}': getopt error" >&2
+				exit 1
+				;;
+		esac
+	done
+}
+
+Parameters "$@"
+
+MAINDIR=$(tar -tf "$TAR" | head -n 1 | awk -F/ '{ print $1 }')
+tar -xzf "$TAR"
+RUMP=$(echo $TAR | sed -e 's|.tar.gz$|.tar.xz|')
+
+tar cfJ "${RUMP}" "$MAINDIR"
+echo "${RUMP} created."
+
+if [ "$REMOVE" = "true" ]
+then
+	rm -r "$MAINDIR"
+else
+	echo "Remove $MAINDIR if not needed any more."
+fi
