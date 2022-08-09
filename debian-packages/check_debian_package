@@ -26,7 +26,7 @@ then
 	echo ""
 fi
 
-CLOSE=$(grep Closes debian/changelog)
+CLOSE=$(grep Closes debian/changelog) || true
 if [ -n "$CLOSE" ]
 then
 	BUGNR=$(echo "$CLOSE" | grep -E "#[[:digit:]]*") || true
@@ -37,7 +37,7 @@ then
 fi
 
 # check correctness of tarball version if existing
-VERSION=$(head -n1 debian/changelog | awk -F'\\(|\\)' '{print $2 }'| sed -e 's|-[[:digit:]]*$||')
+VERSION=$(dpkg-parsechangelog -S Version | sed -e 's|-[[:digit:]]*$||')
 if [ ! -e "../${SOURCE2}_${VERSION}.orig.tar.xz" ]
 then
 	echo "${SOURCE2}_${VERSION}.orig.tar.xz missing - not checking"
@@ -51,7 +51,7 @@ else
 fi
 
 # check version format in changelog
-FULLVERSION=$(head -n1 debian/changelog | awk -F\( '{ print $2 }' | sed -e 's|).*$||')
+FULLVERSION=$(dpkg-parsechangelog -S Version)
 MATCHVERSION=$(echo "$FULLVERSION" | grep -E +[[:digit:]].+[[:digit:]].+[[:digit:]]-+[[:digit:]]) || true
 if [ -z "$MATCHVERSION" ]
 then
@@ -59,15 +59,15 @@ then
 fi
 
 # check email address format and correctness in changelog
-EMAIL1=$(tail -n1 debian/changelog | awk '{ print $4 }')
-NAME=$(tail -n1 debian/changelog | awk '{ print $2 }' | tr [:upper:] [:lower:])
-SURNAME=$(tail -n1 debian/changelog | awk '{ print $3 }' | tr [:upper:] [:lower:])
-DOMAIN=$(awk -F@ '/Maintainer:/ { print $2 }' debian/control)
+EMAIL1=$(dpkg-parsechangelog -S Maintainer | awk '{ print $NF }')
+NAME=$(dpkg-parsechangelog -S Maintainer | awk '{ print $1 }' | tr [:upper:] [:lower:])
+SURNAME=$(dpkg-parsechangelog -S Maintainer | awk '{ print $2 }' | tr [:upper:] [:lower:])
+DOMAIN=$(dpkg-parsechangelog -S Maintainer  | awk -F@ '{ print $2 }')
 
 EMAIL2="<${NAME}.${SURNAME}@${DOMAIN}"
 if [ "$EMAIL1" != "$EMAIL2" ]
 then
-	echo "Email address is: $EMAIL1"
+	echo "Maintainer email address is: $EMAIL1"
 	echo ""
 fi
 
