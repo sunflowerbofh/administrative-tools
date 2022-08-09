@@ -8,7 +8,7 @@ then
 fi
 
 # simple things first
-wrap-and-sort -bast -N
+wrap-and-sort -bast -N || echo "Install devscripts first."
 
 # compare source name in control and changelog file
 SOURCE1=$(head -n 1 debian/changelog |awk '{ print $1 }')
