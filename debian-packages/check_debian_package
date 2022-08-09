@@ -2,6 +2,11 @@
 
 set -e
 
+if [ ! -f /usr/bin/dpkg-parsechangelog ]
+then
+	echo "Install dpkg-dev first."
+fi
+
 # simple things first
 wrap-and-sort -bast -N
 
