@@ -77,7 +77,8 @@ then
 fi
 
 # check upstream name in copyright
-README_NAME=$(head -n3 README.md | awk '/^#/ { print $2 }')
+README=$(find . -maxdepth 1 -iname "readme*")
+README_NAME=$(head -n3 "$README" | awk '/^#/ { print $2 }')
 UPSTREAM_NAME=$(awk '/Upstream-Name:/ { print $2 }' debian/copyright)
 
 if [ -n "$README_NAME" ] && [ "$README_NAME" != "$UPSTREAM_NAME" ]
