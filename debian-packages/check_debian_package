@@ -65,7 +65,7 @@ fi
 
 # check version format in changelog
 FULLVERSION=$(dpkg-parsechangelog -S Version)
-MATCHVERSION=$(echo "$FULLVERSION" | grep -E +[[:digit:]].+[[:digit:]].+[[:digit:]]-+[[:digit:]]) || true
+MATCHVERSION=$(echo "$FULLVERSION" | grep -E "+[[:digit:]].+[[:digit:]].+[[:digit:]]-+[[:digit:]]") || true
 if [ -z "$MATCHVERSION" ]
 then
 	echo "Version number $FULLVERSION in changelog seems to be incorrect."
@@ -73,8 +73,8 @@ fi
 
 # check email address format and correctness in changelog
 EMAIL1=$(dpkg-parsechangelog -S Maintainer | awk '{ print $NF }')
-NAME=$(dpkg-parsechangelog -S Maintainer | awk '{ print $1 }' | tr [:upper:] [:lower:])
-SURNAME=$(dpkg-parsechangelog -S Maintainer | awk '{ print $2 }' | tr [:upper:] [:lower:])
+NAME=$(dpkg-parsechangelog -S Maintainer | awk '{ print $1 }' | tr "[:upper:]" "[:lower:]")
+SURNAME=$(dpkg-parsechangelog -S Maintainer | awk '{ print $2 }' | tr "[:upper:]" "[:lower:]")
 DOMAIN=$(dpkg-parsechangelog -S Maintainer  | awk -F@ '{ print $2 }')
 
 EMAIL2="<${NAME}.${SURNAME}@${DOMAIN}"
@@ -113,7 +113,7 @@ do
 		echo ""
 	else
 		STR=$(awk -v VCS=$PARAM '$0 ~ VCS { print $2 }' debian/control)
-		LAST_LETTER=$(echo -n "$STR" | tail -c 1)
+		LAST_LETTER=$(printf '%s' "$STR" | tail -c 1)
 
 		if [ "$LAST_LETTER" = '/' ]
 		then
@@ -172,11 +172,14 @@ then
 fi
 
 # everything clean?
-if [ -e debian/*.substvars ]
-then
-	echo "Forgotten debian/rules clean?"
-	echo ""
-fi
+for FILE in debian/*.substvars
+do
+	if [ -e "$FILE" ]
+	then
+		echo "Forgotten debian/rules clean?"
+		echo ""
+	fi
+done
 
 # lintian checks if package built
 if [ -e "${PACKAGE}_${VERSION}*deb" ]
