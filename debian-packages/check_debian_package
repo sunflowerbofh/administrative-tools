@@ -31,7 +31,7 @@ fi
 
 ITP=$(curl -s "https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=$BUGNR" | \
 	 grep "Package name" | head -n 1 | awk -F: '{ print $2 }' | \
-	 sed -e 's|^[[:space:]]*||' -e 's|·||')
+	 sed -e 's|^[[:space:]]*||' | sed -e 's|[[:space:]]*$||' -e 's|·||')
 PACKAGE=$(awk '/Package:/ { print $2 }' debian/control)
 
 if [ "$PACKAGE" != "$ITP" ]
