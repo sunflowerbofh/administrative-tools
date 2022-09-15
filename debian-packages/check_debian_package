@@ -22,6 +22,7 @@ fi
 
 # check ITP bug number in changelog
 BUGNR=$(dpkg-parsechangelog -S Closes)
+
 if [ -z "$BUGNR" ]
 then
 	BUGNR=$(grep "Initial release.*Closes:" debian/changelog | awk -F: '{ print $2 }' \
@@ -40,6 +41,7 @@ then
 fi
 
 CLOSE=$(grep Closes debian/changelog) || true
+
 if [ -n "$CLOSE" ]
 then
 	BUGNR=$(echo "$CLOSE" | grep -E "#[[:digit:]]*") || true
@@ -51,6 +53,7 @@ fi
 
 # check correctness of tarball version if existing
 VERSION=$(dpkg-parsechangelog -S Version | sed -e 's|-[[:digit:]]*$||')
+
 if [ ! -e "../${SOURCE2}_${VERSION}.orig.tar.xz" ]
 then
 	echo "${SOURCE2}_${VERSION}.orig.tar.xz missing - not checking"
@@ -66,6 +69,7 @@ fi
 # check version format in changelog
 FULLVERSION=$(dpkg-parsechangelog -S Version)
 MATCHVERSION=$(echo "$FULLVERSION" | grep -E "+[[:digit:]].+[[:digit:]].+[[:digit:]]-+[[:digit:]]") || true
+
 if [ -z "$MATCHVERSION" ]
 then
 	echo "Version number $FULLVERSION in changelog seems to be incorrect."
@@ -76,8 +80,8 @@ EMAIL1=$(dpkg-parsechangelog -S Maintainer | awk '{ print $NF }')
 NAME=$(dpkg-parsechangelog -S Maintainer | awk '{ print $1 }' | tr "[:upper:]" "[:lower:]")
 SURNAME=$(dpkg-parsechangelog -S Maintainer | awk '{ print $2 }' | tr "[:upper:]" "[:lower:]")
 DOMAIN=$(dpkg-parsechangelog -S Maintainer  | awk -F@ '{ print $2 }')
-
 EMAIL2="<${NAME}.${SURNAME}@${DOMAIN}"
+
 if [ "$EMAIL1" != "$EMAIL2" ]
 then
 	echo "Maintainer email address is: $EMAIL1"
@@ -98,6 +102,7 @@ fi
 # check if standards-version is actual
 ACTUAL_POLICY=$(curl -s https://tracker.debian.org/pkg/debian-policy|grep -A 1 std-ver|tail -n1 | sed -e 's|[[:space:]]*||g')
 POLICY=$(awk '/Standards-Version:/ { print $2 }' debian/control)
+
 if [ "$ACTUAL_POLICY" != "$POLICY" ]
 then
 	echo "Debian-policy is $ACTUAL_POLICY, not $POLICY."
@@ -144,6 +149,7 @@ if [ ! -e "$LICENSE" ]
 then
 	LICENSE="LICENSE.txt"
 fi
+
 if [ ! -e "$LICENSE" ]
 then
 	LICENSE="LICENSE.md"
