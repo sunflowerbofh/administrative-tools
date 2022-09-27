@@ -1,0 +1,110 @@
+#!/bin/sh
+
+################################################################################
+# This script creates a repo within the https://salsa.debian.org/php-team/pear/
+# section. It does not save you from doing things manually (you will be
+# provided a snippet afterwards), but a least creates the repo and the necessary branches.
+
+# Attention: This only works if you are member of the PHP pear team:
+# https://salsa.debian.org/php-team/pear
+#
+# You must have a token on salsa:
+# https://salsa.debian.org/-/profile/personal_access_tokens
+# and integrate it by either exporting it as a variable or passing it as first
+# option.
+# Example:
+# echo "export SALSA_TOKEN=\"<TOKEN>\" > /srv/temp/.salsa-token
+# chmod 600 /srv/temp/.salsa-token
+# Add this snippet in your .bashrc:
+# if [ -f /srv/temp/.salsa-token ]
+# then
+#        source /srv/temp/.salsa-token
+# fi
+#
+# Reference: https://wiki.debian.org/Teams/DebianPHPGroup/Composer
+################################################################################
+
+set -e
+
+MYTOKEN="$SALSA_TOKEN"
+if [ -z "$MYTOKEN" ]
+then
+	MYTOKEN="$1"
+fi
+if [ -z "$MYTOKEN" ]
+then
+	echo "Usage: $0 \$SALSA_TOKEN"
+	exit 1
+fi
+
+if [ ! -e /usr/bin/salsa ]
+then
+	echo "Command 'salsa' not found -> install devscripts"
+	exit 1
+fi
+
+TMP=$(mktemp /tmp/XXXXX --suffix _debrepo)
+
+PACKAGE="$1"
+while [ -z "$PACKAGE" ]
+do
+	echo "What is the name of the package you want to build (e.g. php-svg-sanitizer)?"
+	read PACKAGE
+done
+echo "PACKAGE=$PACKAGE" >> "$TMP"
+
+while [ -z "$GITREPO" ]
+do
+	echo "Enter the name of the upstream gitrepo (e.g. https://github.com/enshrine/svg-saniziter)"
+	read GITREPO
+done
+# remove trailing slashes
+GITREPO=$(echo "$GITREPO" | sed -e 's|/$||')
+echo "GITREPO=$GITREPO" >> "$TMP"
+
+while [ -z "$VERSION" ]
+do
+	echo "Enter the version you want to build (e.g. 0.15.4)."
+	read VERSION
+done
+echo "VERSION=$VERSION" >> "$TMP"
+
+. "$TMP"
+
+echo "Creating repo https://salsa.debian.org/php-team/pear/$PACKAGE ..."
+sleep 3
+
+salsa create_repo --group php-team/pear $PACKAGE
+sleep 1
+mkdir "$PACKAGE"
+cd "$PACKAGE"
+
+git init
+git remote add origin git@salsa.debian.org:php-team/pear/${PACKAGE}.git
+
+git remote add upstream $GITREPO
+git fetch --all
+
+salsa update_safe --group php-team/pear --ci-config-path recipes/debian.yml@salsa-ci-team/pipeline "$PACKAGE"
+
+# push the branch debian/latest first for that it will become default branch
+
+echo "The repo ist now created. Do the following steps:
+###############################
+cd $PACKAGE
+git checkout -b upstream/latest
+git pull upstream master || git pull upstream main
+git log
+git reset --hard <commitnr> (until the tag of $VERSION)
+git checkout --orphan debian/latest
+git add .
+git commit -sam \"Adding upstream version ${VERSION}.\"
+git push --set-upstream origin debian/latest
+#################################"
+
+echo ""
+echo "Then add the debian directory, commit and push again."
+echo ""
+echo "------------------"
+echo "Call \"add-debian-directory $TMP\" if you want to create the files for debian/ directory"
+echo "------------------"
